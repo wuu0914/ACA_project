@@ -1,0 +1,13 @@
+[spike]
+repository = "https://github.com/riscv-software-src/riscv-isa-sim.git"
+commit = "02b1dc182164bb73b19b050676dd89f0834f8b2e"
+version = "1.1.1-dev"
+source = "deps/sources/spike"
+build = "deps/.work/spike-build"
+install_prefix = "deps/tools/riscv"
+
+[spike.build]
+configure_flags = [
+    "--with-boost=<install-prefix>/host-deps/usr",
+    "--with-boost-libdir=<install-prefix>/host-deps/usr/lib/x86_64-linux-gnu",
+]

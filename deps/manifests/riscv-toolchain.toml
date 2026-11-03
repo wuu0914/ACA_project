@@ -1,0 +1,9 @@
+[toolchain]
+name = "riscv64-unknown-elf"
+release = "2026.08.27"
+gcc_version = "16.1.0"
+binutils_version = "2.47.20260726"
+archive = "riscv64-elf-ubuntu-22.04-gcc-2026.08.27.tar.xz"
+url = "https://github.com/riscv-collab/riscv-gnu-toolchain/releases/download/2026.08.27/riscv64-elf-ubuntu-22.04-gcc.tar.xz"
+sha256 = "dcfb2234a45f2166e33ae9124dec8b5253e6d08e63be139fc4d0014b2802f964"
+install_prefix = "deps/tools/riscv"

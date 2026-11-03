@@ -1,0 +1,68 @@
+[efficientnet_lite0_int8]
+source_archive_url = "https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/lite/efficientnet-lite0.tar.gz"
+source_archive_sha256 = "9949101418ad69ec4639bfadd526e86793da6f59ae511bb01671f5b41c331374"
+path = "models/upstream/efficientnet-lite0-int8.tflite"
+sha256 = "31c18ecf5cfb7bddf182e450e4029834271fc70e15b5fae6ddb5995ac2a6de51"
+size_bytes = 5422760
+format = "TFLite FlatBuffer schema version 3"
+integer_only = true
+official_imagenet_top1_percent = 74.4
+
+[efficientnet_lite0_int8.input]
+name = "images"
+shape = [1, 224, 224, 3]
+dtype = "uint8"
+scale = 0.012566016986966133
+zero_point = 131
+normalization = "(RGB pixel - 127.0) / 128.0, then quantize with this tensor's scale and zero point"
+
+[efficientnet_lite0_int8.output]
+name = "Softmax"
+shape = [1, 1000]
+dtype = "uint8"
+scale = 0.00390625
+zero_point = 0
+
+[efficientnet_lite0_fp32]
+source_archive_url = "https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/lite/efficientnet-lite0.tar.gz"
+source_archive_sha256 = "9949101418ad69ec4639bfadd526e86793da6f59ae511bb01671f5b41c331374"
+path = "models/upstream/efficientnet-lite0-fp32.tflite"
+sha256 = "b92051d5c20200b39fcedb59c1d2e8942bb44aa8b950e6d75c8c9accebdad600"
+size_bytes = 18570208
+format = "TFLite FlatBuffer schema version 3"
+integer_only = false
+official_imagenet_top1_percent = 75.1
+
+[efficientnet_lite0_fp32.input]
+name = "images"
+shape = [1, 224, 224, 3]
+dtype = "float32"
+normalization = "(RGB pixel - 127.0) / 128.0"
+
+[efficientnet_lite0_fp32.output]
+name = "Softmax"
+shape = [1, 1000]
+dtype = "float32"
+
+[efficientnet_lite0_pytorch]
+implementation = "timm:tf_efficientnet_lite0"
+weights_url = "https://github.com/rwightman/pytorch-image-models/releases/download/v0.1-weights/tf_efficientnet_lite0-0aa007d2.pth"
+weights_sha256 = "0aa007d2f73be7b75909ac7aba43c229a8ff9a8c5a0e27bfd53faac31dc25381"
+path = "models/upstream/tf_efficientnet_lite0-0aa007d2.pth"
+size_bytes = 18820223
+parameters = 4652008
+input_shape = [1, 3, 224, 224]
+timm_default_normalization_mean = [0.5, 0.5, 0.5]
+timm_default_normalization_std = [0.5, 0.5, 0.5]
+phase1_1_normalization = "use shared official TensorFlow/TPU preprocessing: (RGB pixel - 127.0) / 128.0"
+note = "timm port of the TensorFlow/TPU weights; output logits require softmax"
+
+[phase1_1_test_image]
+path = "models/testdata/panda.jpg"
+sha256 = "2389d1990f74682ab3fb7df3e31ef15d7da7cd0368f85c594f74c76a3eebc0ad"
+source_url = "https://upload.wikimedia.org/wikipedia/commons/f/fe/Giant_Panda_in_Beijing_Zoo_1.JPG"
+
+[imagenet_labels]
+path = "models/testdata/labels_map.txt"
+sha256 = "be557fc1338e7892f9845fe785a678e211256e6948a26482b8345ba1d213cc88"
+source_url = "https://storage.googleapis.com/cloud-tpu-checkpoints/efficientnet/eval_data/labels_map.txt"

@@ -1,0 +1,21 @@
+# Python
+**/.venv/
+**/__pycache__/
+*.py[cod]
+
+# Downloaded and generated models
+/models/upstream/
+
+# Installed tools, dependency build/download workspace, and project outputs
+/deps/tools/
+/deps/.work/
+/deps/sources/*/
+/build/
+
+# Tutorial build outputs
+/tutorials/*/build/
+
+# Editor and OS files
+.DS_Store
+*.swp
+*~

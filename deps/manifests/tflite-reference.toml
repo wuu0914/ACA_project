@@ -1,0 +1,15 @@
+[tensorflow]
+repository = "https://github.com/tensorflow/tensorflow.git"
+commit = "0e2d96d26c9621dbe1998ba740b5e2e5d14ffec5"
+source = "deps/sources/tensorflow"
+sparse_path = "tensorflow/lite"
+
+[gemmlowp]
+repository = "https://github.com/google/gemmlowp.git"
+commit = "16e8662c34917be0065110bfcd9cc27d30f52fdf"
+source = "deps/sources/gemmlowp"
+
+[ruy]
+repository = "https://github.com/google/ruy.git"
+commit = "2af88863614a8298689cc52b1a47b3fcad7be835"
+source = "deps/sources/ruy"

@@ -1,0 +1,5 @@
+[cvw]
+status = "not installed"
+source = "deps/sources/cvw"
+repository = "to be provided"
+commit = "to be provided"
