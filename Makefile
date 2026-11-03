@@ -18,7 +18,6 @@ LINK_FLAGS := -march=rv64imc -mabi=lp64 -mcmodel=medany \
 
 export PATH := $(RISCV)/bin:$(HOST_PREFIX)/bin:$(PATH)
 export LD_LIBRARY_PATH := $(HOST_LIBDIR):$(LD_LIBRARY_PATH)
-export UV_CACHE_DIR := $(ROOT)/deps/.work/uv-cache
 export PYTHONDONTWRITEBYTECODE := 1
 export IMAGENET_ROOT IMAGENET_ARCHIVE IMAGENET_LABELS IMAGENET_SYNSETS
 

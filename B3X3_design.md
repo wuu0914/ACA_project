@@ -412,6 +412,28 @@ else:
 rd = sign_extend_64(INT8(result))
 ```
 
+實際硬體不需要依序做兩次 signed comparison，可以直接檢查
+`value[31:7]` 並依 sign bit 選擇輸出：
+
+```text
+upper = value[31:7]
+
+in_range = (upper 全為 0) or (upper 全為 1)
+
+if in_range:
+    result32 = value[31:0]
+else if value[31] == 0:
+    result32 = 0x0000007f       # 正數上溢，輸出 127
+else:
+    result32 = 0xffffff80       # 負數下溢，輸出 -128
+
+rd = sign_extend_64(result32)
+```
+
+`upper` 全為 0 時原值只可能是 `0..127`；`upper` 全為 1 時原值只可能是
+`-128..-1`。其他 bit pattern 代表已經超出 INT8 範圍，因此用
+`value[31]` 就能判斷要 saturate 到上界或下界。
+
 Xclip8 只負責 signed INT8 clamp，不包含 output offset 的加法。B3 原本最後一段：
 
 ```asm
