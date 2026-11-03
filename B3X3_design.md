@@ -300,15 +300,9 @@ probe function 另有一個最後的 `ret`。
 
 
 
-## 3. 為什麼 B3 不 pack multiplier 與 shift
+## 3. B3 不 pack multiplier 與 shift
 
-目前每個 channel 使用：
-
-```text
-int32 multiplier + int32 shift = 8 bytes
-```
-
-改成一個 `uint64_t` 仍是 8 bytes，不節省常數空間。它也不會直接省下一條 RV64
+我原本打算使用 pack multiplier 來壓縮，並透過 ld 一次讀入所需資料。但其實不會直接省下一條 RV64
 instruction，因為 `ld` 之後必須再拆出兩個 signed INT32 values：
 
 ```asm
@@ -382,8 +376,7 @@ B3 影響的 Conv2D + Depthwise outputs
 | B3 保守預測 | 828,844,814 | -15.75% | 0.464728 |
 | B3 常見路徑預測 | 822,107,118 | -16.44% | 0.468537 |
 
-這是 retired-instruction 預測，不是 cycle 預測。inline 後的 register pressure、branch
-結果與未來處理器的 multiplier latency，都必須在實作後另外量測。
+這是 retired-instruction 預測，不是 cycle 預測。
 
 
 

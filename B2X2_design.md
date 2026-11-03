@@ -25,45 +25,13 @@ X1 全模型 instructions：             1,647,729,506
 conv2d_s8 instructions：                440,265,854  (26.72%)
 depthwise_conv2d_s8 instructions：      921,897,095  (55.95%)
 Depthwise estimated MACs：               34,532,064  (8.96%)
+有效 taps MACs：                         30,648,416
 ```
 
-X1 將 Conv2D 從 `3,242,185,190` 降至 `440,265,854` instructions，DepthwiseConv2D 從 B0 的第二大成本變成 X1 全模型最大的瓶頸。 Depthwise 的 estimated MACs 為 `34,532,064`；扣除 SAME padding 外不會執行的 taps 後，實際只有 `30,648,416` 次有效 MAC。但在 B0 卻占用 20.72% 的 retired
-instructions。
+X1 將 Conv2D 從 `3,242,185,190` 降至 `440,265,854` instructions，DepthwiseConv2D 從 B0 的第二大成本變成 X1 全模型最大的瓶頸。 Depthwise 的 estimated MACs 為 `34,532,064`；扣除 SAME padding 外不會執行的 taps 後，實際只有 `30,648,416` 次有效 MAC。但在 B0 卻占用 20.72% 的 retired instructions。
 
 因此 B2 應優先消除重複的控制與位址工作，而不是先新增更多乘法硬體：padding
 有效範圍只和 output position 有關，可以移到 channel loop 外判斷；可以用 walking pointers；相鄰 channels 可以共用同位置的 index，能用多個 accumulators 分攤控制成本。
-
-目前 16 個 DepthwiseConv2D 全部符合：
-
-```text
-depth_multiplier == 1
-dilation_H == 1
-dilation_W == 1
-output_C == input_C
-input_C % 8 == 0
-input_offset == 128
-```
-
-因此可以做 fast path，不符合的一般 Depthwise shape 仍保留 scalar fallback。
-
-## 1. X1 DepthwiseConv2D profile
-
-Phase 3-3 的實測結果為：
-
-```text
-X1 全模型 instructions：             1,647,729,506
-depthwise_conv2d_s8 instructions：      921,897,095
-Depthwise 名義 MACs：                    34,532,064
-Depthwise output elements：               2,306,528
-```
-
-名義 MACs 以每個 output element 乘上完整的 `filter_H * filter_W`，因此包含
-SAME padding 外的 taps。現在的 C kernel 會略過 padding，真正執行的 MACs 為：
-
-```text
-有效 taps MACs：                         30,648,416
-被 padding 略過的 MACs：                  3,883,648
-```
 
 目前 16 個 DepthwiseConv2D 都符合：
 
@@ -76,16 +44,13 @@ input_C % 8 == 0
 input_offset == 128
 ```
 
-因此 B2-2 一次處理四個 channels 時沒有 channel tail。未來若將 kernel 泛化，
-不符合上述條件的 operator 仍應保留原本的 scalar fallback。
-
 
 ### 試算方式
 
 目前 `depthwise_conv2d_s8` 的 Spike histogram 與 objdump 可分成：
 
 ```text
-保留的 output、requantize 呼叫準備與外層工作：  94,705,543
+保留的 output、requantize 呼叫準備與外層工作：    94,705,543
 B2 filter-range、row 與 tile setup 預留：        10,000,000
 ```
 
@@ -114,7 +79,7 @@ B2 filter-range、row 與 tile setup 預留：        10,000,000
 
 
 
-## 2. B2-1：有效範圍與 pointer walking - 穩賺不賠
+## 1. B2-1：移動判定位置與 pointer walking - 穩賺不賠
 
 目前 kernel 在每一個 channel、每一個 filter tap 內計算 input index，並判斷該
 位置是否落在圖片內：
@@ -205,10 +170,6 @@ Depthwise body
 | B2-1 Depthwise body 相對目前 X1 Depthwise | 約 -62.05% |
 | B2-1 全模型相對目前 X1 | 約 -34.71% |
 
-這一版的主要收益不是減少必要的 MAC，而是把通用 kernel 中反覆執行的 boundary
-check、dilation/index calculation 與額外 branches 移到 inner loop 外。
-
-
 
 
 ## 3. B2-2：四個 output channels - 提高 Register Utilization
@@ -252,7 +213,7 @@ inner-loop branch
 
 ```text
 B2-1：4 * 8 = 32 instructions
-B2-2：            23 instructions
+B2-2：        23 instructions
 ```
 
 省下的是三組 input/filter pointer updates 與三次 inner-loop branches；四個
@@ -293,7 +254,7 @@ B2-2 相較 B2-1 再省：
 
 
 
-## 4. B2-3：adjusted bias 與實體 padding - 最好的做法省的指令數要打折且需要額外記憶體空間
+## 4. B2-3：adjusted bias 與實體 padding - 最好解法中，省下的指令數要打折且需要額外記憶體空間 (未做)
 
 原始 DepthwiseConv2D 對有效 taps 計算：
 
@@ -465,23 +426,6 @@ B2-3 相較 B2-2 只省：
 | B2-3 全模型相對目前 X1 | 約 -39.39% |
 
 
-### 為什麼目前階段不值得做 B2-3？
-
-1. 在理想的 64-bit fill/copy 假設下，整體仍只比 B2-2 少約 `0.80%`。
-2. 需要約 `1.25 MiB` reusable padded scratch，並修改 tensor arena 與 executor。
-3. Generator 必須新增 16 層 Depthwise adjusted bias、overflow bound check 與新的
-   kernel contract。
-4. 完整 filter 多執行 `3,883,648` 個 padding MACs，抵銷大部分 offset-add 收益。
-5. 如果 compiler 沒產生對齊的 `ld/sd` copy loop，資料準備可能比上述估計更貴。
-6. 讓上一層直接輸出 padded layout 可以避免 interior copy，但會影響 Conv2D、ADD
-   residual 與 tensor arena layout，已超出目前 B2 的最小修改範圍。
-
-因此 B2 目前應實作到 B2-2。X2 也直接延續 B2-2，不依賴 B2-3 的 adjusted bias
-或 padded layout；`input_offset == 128` 改由 Xdwmac2 的 instruction contract 處理。
-
-
-
-
 ## 5. 三個 B2 版本比較
 
 | 版本 | Depthwise inner-loop | 預估 Depthwise body | 預估全模型 | 相對 X1 |
@@ -508,7 +452,7 @@ B2-1 與 B2-2 的改善值得實作；B2-3 的軟體單獨收益不足以合理�
 
 
 
-## 6. X2：Xdwmac2 instruction contract
+## 6. X2：Xdwmac2 instruction contract (未做)
 
 Xqmac8 將八個 lane products 水平加總到一個 accumulator，不能直接用於
 DepthwiseConv2D。四個相鄰 Depthwise channels 必須保留四個獨立 accumulators。
@@ -744,17 +688,3 @@ adjusted bias 時所付出的硬體成本。
 9. 固定 panda 的 intermediate 與 final outputs 都與 TFLite byte-exact。
 10. ISA byte-exact 後，再用 CV-Wally 評估 cycles、CPI、area、Fmax 與 critical
     path。
-
-
-
-
-## 10. 目前實作範圍建議
-
-- B2 實作 B2-1 與 B2-2，保留原始 scalar fallback。
-- B2 不先實作 adjusted bias、padded tensor layout 或 per-position correction。
-- B2 實測完成後，以實際 B2 profile 修正 X2 預測。
-- X2 直接以 B2-2 為基礎；Xdwmac2 在硬體內完成固定 `input_offset = 128`。
-- X2 不加入 B2-3 的 adjusted bias、padded input 或 padding preparation。
-- X2 不新增 multi-destination Xdwmac4，也不修改 requantization。
-- Spike 只用來量 ISA retired instructions；硬體 speedup 與面積以 CV-Wally RTL
-  結果為準。

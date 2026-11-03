@@ -5,12 +5,14 @@
 
 # Downloaded and generated models
 /models/upstream/
+/models/dataset/
 
 # Installed tools, dependency build/download workspace, and project outputs
 /deps/tools/
 /deps/.work/
 /deps/sources/*/
-/build/
+/build/*
+!/build/spike_profile_summary.md
 
 # Tutorial build outputs
 /tutorials/*/build/

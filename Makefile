@@ -1,5 +1,8 @@
 ROOT := $(CURDIR)
 RISCV := $(ROOT)/deps/tools/riscv
+HOST_PREFIX ?= /usr
+HOST_LIBDIR ?= $(HOST_PREFIX)/lib/x86_64-linux-gnu
+IMAGENET_ROOT ?= $(ROOT)/models/dataset/imagenet
 JOBS ?= 8
 
 UV_LITERT := uv run --offline --project envs/litert
@@ -13,12 +16,13 @@ LINK_FLAGS := -march=rv64imc -mabi=lp64 -mcmodel=medany \
 	-nostdlib -nostartfiles -static -Wl,-T,src/platform/spike/link.ld \
 	-Wl,--gc-sections
 
-export PATH := $(RISCV)/bin:$(PATH)
-export LD_LIBRARY_PATH := $(RISCV)/host-deps/usr/lib/x86_64-linux-gnu:$(LD_LIBRARY_PATH)
+export PATH := $(RISCV)/bin:$(HOST_PREFIX)/bin:$(PATH)
+export LD_LIBRARY_PATH := $(HOST_LIBDIR):$(LD_LIBRARY_PATH)
 export UV_CACHE_DIR := $(ROOT)/deps/.work/uv-cache
 export PYTHONDONTWRITEBYTECODE := 1
+export IMAGENET_ROOT IMAGENET_ARCHIVE IMAGENET_LABELS IMAGENET_SYNSETS
 
-.PHONY: help setup deps fetch-toolchain fetch-spike fetch-model \
+.PHONY: help setup check-host check-uv deps dataset check-dataset fetch-toolchain fetch-spike fetch-model \
 	fetch-tflite-reference build-spike envs env-pytorch env-litert \
 	check-litert check-pytorch check-spike \
 	test-models test-kernels test-optimized-kernels test-all-kernels test-c-models \
@@ -27,12 +31,15 @@ export PYTHONDONTWRITEBYTECODE := 1
 help:
 	@echo "Environment:"
 	@echo "  make setup                  fetch and build the complete environment"
+	@echo "  make check-host             check the Spike host dependencies"
 	@echo "  make fetch-toolchain        install the RISC-V GNU toolchain"
 	@echo "  make fetch-spike            fetch the pinned Spike source"
 	@echo "  make build-spike            build and install Spike"
 	@echo "  make fetch-model            download the three model files"
 	@echo "  make fetch-tflite-reference fetch TFLite, gemmlowp, and Ruy"
 	@echo "  make envs                   create both Python environments"
+	@echo "  make dataset                prepare the ImageNet validation set"
+	@echo "  make check-dataset          validate the prepared ImageNet data"
 	@echo ""
 	@echo "Validation:"
 	@echo "  make test-models            compare PyTorch and both TFLite models"
@@ -46,9 +53,23 @@ help:
 	@echo "  make profile-report         collect the six existing profile files"
 
 # Complete environment. The individual targets below can also be run separately.
-setup: deps envs build-spike
+setup: check-host check-uv deps envs build-spike
+
+check-host:
+	@command -v dtc >/dev/null || { echo "error: install device-tree-compiler"; exit 1; }
+	@test -f "$(HOST_PREFIX)/include/boost/regex.hpp" || { echo "error: install libboost-regex-dev"; exit 1; }
+	@test -e "$(HOST_LIBDIR)/libboost_system.so" || { echo "error: install libboost-system-dev"; exit 1; }
+
+check-uv:
+	@command -v uv >/dev/null || { echo "error: install uv and add it to PATH"; exit 1; }
 
 deps: fetch-toolchain fetch-spike fetch-model fetch-tflite-reference
+
+dataset:
+	python3 scripts/prepare_imagenet.py
+
+check-dataset:
+	python3 scripts/prepare_imagenet.py --check
 
 fetch-toolchain:
 	scripts/fetch-deps.sh toolchain
@@ -62,17 +83,18 @@ fetch-model:
 fetch-tflite-reference:
 	scripts/fetch-deps.sh tflite-reference
 
-build-spike: fetch-toolchain fetch-spike
+build-spike: check-host fetch-toolchain fetch-spike
 	mkdir -p deps/.work/spike-build
 	cd deps/.work/spike-build && \
+		CFLAGS="-Wno-error" CXXFLAGS="-Wno-error" \
 		../../sources/spike/configure \
 		--prefix="$(RISCV)" \
-		--with-boost="$(RISCV)/host-deps/usr" \
-		--with-boost-libdir="$(RISCV)/host-deps/usr/lib/x86_64-linux-gnu"
+		--with-boost="$(HOST_PREFIX)" \
+		--with-boost-libdir="$(HOST_LIBDIR)"
 	$(MAKE) -C deps/.work/spike-build -j$(JOBS)
 	$(MAKE) -C deps/.work/spike-build install
 
-envs: env-pytorch env-litert
+envs: check-uv env-pytorch env-litert
 
 env-pytorch:
 	uv sync --project envs/pytorch

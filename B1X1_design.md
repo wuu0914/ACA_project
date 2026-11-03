@@ -329,14 +329,3 @@ B1 tile 4 inner-loop cost：       4.75 instructions/MAC
 4. objdump 確認四個 accumulators 沒有 stack spill。
 5. 載入正式 Spike extension 後，固定 panda uint8[1000] output byte-exact。
 6. 通過 correctness 後才量測 Xqmac8 count 與完整 instruction profile。
-
-
-## 7. 目前不做的項目
-
-- 不優化 DepthwiseConv2D。
-- 不優化 FullyConnected。
-- 不修改 quantization rounding。
-- 不修改 TFLite model tensor layout。
-- 不為 B1/X1 複製 executor 或 testbench。
-- B1/X1 只維護一份 generate-time adjusted model data。
-- 不用 Phase 3-1 的估計取代 Phase 3-2、3-3 的實際 Spike 量測。
